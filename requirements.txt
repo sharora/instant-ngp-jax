@@ -1,0 +1,7 @@
+flax
+optax
+wandb
+tqdm
+pandas
+matplotlib
+jaxlie
