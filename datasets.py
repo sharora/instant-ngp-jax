@@ -30,7 +30,8 @@ class SceneTrainDataset:
 @dataclass
 class SceneTestDataset:
     test_poses: T.List[jnp.ndarray]
-    test_imgs: T.Optional[T.List[jnp.ndarray]] = None
+    camera_calibration: jnp.ndarray
+    test_imgs: T.List[jnp.ndarray]
 
 
 def download_dataset() -> None:
@@ -83,6 +84,11 @@ def get_raw_scene_data(
     K = jnp.array([[f, 0, cx], [0, f, cy], [0, 0, 1]])
 
     return images, poses, K
+
+
+def load_test_dataset(scene_name: str):
+    test_images, test_poses, camera_cal = get_raw_scene_data(scene_name, "test")
+    return SceneTestDataset(test_poses, camera_cal, test_images)
 
 
 def load_scene_train_data(

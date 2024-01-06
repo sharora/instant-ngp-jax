@@ -5,3 +5,5 @@ tqdm
 pandas
 matplotlib
 jaxlie
+gdown
+tyro

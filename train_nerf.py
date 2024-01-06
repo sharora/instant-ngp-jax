@@ -1,3 +1,4 @@
+import os
 import typing as T
 from dataclasses import dataclass
 
@@ -18,12 +19,13 @@ from models import NeRF, NeRFConfig, make_nerf_model, render_image
 @dataclass
 class TrainConfig:
     epochs: int = 100
-    # batch_size: int = 2048
-    batch_size: int = 1
-    init_lr: float = 5e-5
+    batch_size: int = 3072
+    init_lr: float = 5e-4
     lr_decay_rate: float = 0.9
+    transition_steps: int = 5000
+    lr_floor: float = 5e-5
     scene_name: str = "lego"
-    checkpoint_dir: str = "./checkpoints"
+    checkpoint_dir: str = os.path.abspath("./checkpoints")
     nerf_config: NeRFConfig = NeRFConfig()
 
 
@@ -33,10 +35,11 @@ def create_train_state(nerf: NeRF, config: TrainConfig, rng: jnp.ndarray) -> Tra
     params = nerf.init(rng, jnp.ones(3), jnp.ones(3), input_rng)["params"]
     exponential_decay_scheduler = optax.exponential_decay(
         init_value=config.init_lr,
-        transition_steps=0,
+        transition_steps=config.transition_steps,
         decay_rate=config.lr_decay_rate,
         transition_begin=0,
         staircase=False,
+        end_value=config.lr_floor,
     )
     tx = optax.adam(learning_rate=exponential_decay_scheduler)
     return TrainState.create(apply_fn=nerf.apply, params=params, tx=tx)
@@ -98,9 +101,9 @@ def validate_model(
             input_rng,
         )
         val_mses.append(jnp.mean((rgb - img) ** 2))
-        val_images.append(wandb.Image(jnp.clip(rgb, 0, 1)))
+        val_images.append(wandb.Image(np.array(jnp.clip(rgb, 0, 1))))
         # TODO: maybe there is a better solution for normalizing the depth image
-        val_depths.append(wandb.Image(jnp.clip(depth / jnp.max(depth), 0, 1)))
+        val_depths.append(wandb.Image(np.array(jnp.clip(depth / jnp.max(depth), 0, 1))))
     val_mse = np.mean(val_mses)
     wandb.log(
         {

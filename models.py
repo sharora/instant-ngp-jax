@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 from flax import linen as nn
 from flax.training.train_state import TrainState
-from jax import Array, vmap
+from jax import Array, jit, vmap
 
 from encoders import Encoder, FourierEncoder
 
@@ -44,6 +44,7 @@ class NerfMLP(nn.Module):
         return density, rgb
 
 
+# TODO: add background color option
 class NeRF(nn.Module):
     position_encoder: Encoder
     direction_encoder: Encoder
@@ -97,9 +98,10 @@ def render_image(
 ):
     rays = get_rays(pose, camera_cal, image_shape)
     ray_origin = pose[:3, 3]
-    input_rng = jax.random.split(rng, num=rays.shape)
+    input_rng = jax.random.split(rng, num=rays.shape[:-1])
 
     # render image row by row (memory is limited)
+    @jit
     def render_row(i: int):
         return vmap(state.apply_fn, in_axes=(None, None, 0, 0))(
             {"params": state.params}, ray_origin, rays[i], input_rng[i]

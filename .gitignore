@@ -1,6 +1,7 @@
 nerf_synthetic/
 .vscode/
 wandb/
+checkpoints
 
 # Default python stuff
 # Byte-compiled / optimized / DLL files
