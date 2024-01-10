@@ -7,15 +7,16 @@ from flax import linen as nn
 from flax.training.train_state import TrainState
 from jax import Array, jit, vmap
 
-from encoders import Encoder, FourierEncoder
+from encoders import Encoder, FourierEncoder, HashEncoder, SphericalHarmonicsEncoder
 
 
 class NerfMLP(nn.Module):
     num_layers_density: int = 8
     num_layers_rgb: int = 2
+    density_output_size: int = 256
     layer_width_density: int = 256
     layer_width_rgb: int = 128
-    density_skip_layer: int = num_layers_density // 2
+    density_skip_layer: T.Optional[int] = num_layers_density // 2
 
     @nn.compact
     def __call__(
@@ -31,6 +32,7 @@ class NerfMLP(nn.Module):
                 if i == self.density_skip_layer
                 else x
             )
+        x = nn.Sequential([nn.Dense(self.density_output_size), nn.relu])(x)
         density = x[:, 0]
 
         # then use the features and view_dir to get the color
@@ -44,7 +46,7 @@ class NerfMLP(nn.Module):
         return density, rgb
 
 
-# TODO: add background color option
+# TODO: add background color option, currently assumes it is black
 class NeRF(nn.Module):
     position_encoder: Encoder
     direction_encoder: Encoder
@@ -76,16 +78,28 @@ class NeRF(nn.Module):
         return rgb, depth
 
 
-# TODO: fill out config
 @dataclass
 class NeRFConfig:
-    pass
+    instant_ngp: bool = False
 
 
+# TODO: we should probably expose more config options here, works for now
 def make_nerf_model(config: NeRFConfig) -> NeRF:
-    position_encoder = FourierEncoder(num_freq=10)
-    direction_encoder = FourierEncoder(num_freq=4)
-    mlp = NerfMLP()
+    if config.instant_ngp:
+        position_encoder = HashEncoder()
+        direction_encoder = SphericalHarmonicsEncoder(deg=4)
+        mlp = NerfMLP(
+            num_layers_density=1,
+            num_layers_rgb=2,
+            density_output_size=16,
+            layer_width_density=64,
+            layer_width_rgb=64,
+            density_skip_layer=None,
+        )
+    else:
+        position_encoder = FourierEncoder(num_freq=10)
+        direction_encoder = FourierEncoder(num_freq=4)
+        mlp = NerfMLP()
     return NeRF(position_encoder, direction_encoder, mlp)
 
 
