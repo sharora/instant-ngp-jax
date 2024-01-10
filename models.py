@@ -33,7 +33,7 @@ class NerfMLP(nn.Module):
                 else x
             )
         x = nn.Sequential([nn.Dense(self.density_output_size), nn.relu])(x)
-        density = x[:, 0]
+        density = x[0]
 
         # then use the features and view_dir to get the color
         x = jnp.concatenate([x, view_enc], axis=-1)
@@ -58,16 +58,15 @@ class NeRF(nn.Module):
     ) -> T.Tuple[Array, Array]:
         # first sample points along every ray
         sample_points, t = sample_points_along_ray(ray_origin, ray_direction, rng, 256)
-        ray_dirs = jnp.repeat(
-            ray_direction[jnp.newaxis, :], sample_points.shape[0], axis=0
-        )
 
         # encode the points/directions
         point_encodings = vmap(self.position_encoder)(sample_points)
-        direction_encodings = vmap(self.direction_encoder)(ray_dirs)
+        direction_encoding = self.direction_encoder(ray_direction)
 
         # get rgb and density at points
-        densities, colors = self.mlp(point_encodings, direction_encodings)
+        densities, colors = vmap(self.mlp, in_axes=(0, None))(
+            point_encodings, direction_encoding
+        )
 
         # use the volume rendering equation to get the pixel values for each ray
         weights = rendering_weights(densities, t)
@@ -80,14 +79,16 @@ class NeRF(nn.Module):
 
 @dataclass
 class NeRFConfig:
-    instant_ngp: bool = False
+    instant_ngp: bool = True
 
 
 # TODO: we should probably expose more config options here, works for now
 def make_nerf_model(config: NeRFConfig) -> NeRF:
     if config.instant_ngp:
         position_encoder = HashEncoder()
-        direction_encoder = SphericalHarmonicsEncoder(deg=4)
+        # TODO: find out why spherical harmonics isn't working
+        # direction_encoder = SphericalHarmonicsEncoder(4)
+        direction_encoder = FourierEncoder(num_freq=4)
         mlp = NerfMLP(
             num_layers_density=1,
             num_layers_rgb=2,

@@ -34,6 +34,7 @@ class HashEncoder(Encoder):
     n_max: int = 4096
     d: int = 3
     pis: jnp.ndarray = jnp.array([1, 2654435761, 805459861])
+    bounds: float = 3.0
 
     def setup(self) -> None:
         # TODO: this is different from paper since the initializer uniformly samples from [0, 1e-4] instead of [-1e-4, 1e-4]
@@ -46,6 +47,9 @@ class HashEncoder(Encoder):
         assert self.d <= 3, "Only up to 3D is supported."
         assert self.L >= 1, "At least one level is required."
         assert self.n_min > 0, "n_min must be positive."
+
+        # map x in [-bounds, bounds]^3 to [0, 1]^3
+        x = (x + self.bounds) / (2 * self.bounds)
 
         # computing resolution levels using n_min, n_max as described in the paper
         b = jnp.exp(jnp.log(self.n_max / self.n_min) / (self.L - 1))

@@ -20,9 +20,11 @@ from models import NeRF, NeRFConfig, make_nerf_model, render_image
 class TrainConfig:
     epochs: int = 100
     batch_size: int = 3072
-    init_lr: float = 5e-4
-    lr_decay_rate: float = 0.9
-    transition_steps: int = 5000
+    # init_lr: float = 5e-4
+    init_lr: float = 1e-2
+    # lr_decay_rate: float = 0.9
+    lr_decay_rate: float = 0.33
+    transition_steps: int = 10000
     lr_floor: float = 5e-5
     scene_name: str = "lego"
     checkpoint_dir: str = os.path.abspath("./checkpoints")
@@ -32,7 +34,7 @@ class TrainConfig:
 def create_train_state(nerf: NeRF, config: TrainConfig, rng: jnp.ndarray) -> TrainState:
     """Creates an initial `TrainState`."""
     rng, input_rng = jax.random.split(rng)
-    params = nerf.init(rng, jnp.ones(3), jnp.ones(3), input_rng)["params"]
+    params = nerf.init(rng, jnp.ones(3), jnp.ones(3) / jnp.sqrt(3), input_rng)["params"]
     exponential_decay_scheduler = optax.exponential_decay(
         init_value=config.init_lr,
         transition_steps=config.transition_steps,
